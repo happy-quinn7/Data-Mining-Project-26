@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Keystroke Dynamics Collector (coursework)",
+  "version": "1.0",
+  "description": "Records your own keystroke timings while chatting with an LLM, for the INSA Data-Mining project.",
+
+  "permissions": ["storage"],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://chat.mistral.ai/*"
+      ],
+      "js": ["content.js"],
+      "css": ["indicator.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Keystroke Collector"
+  }
+}

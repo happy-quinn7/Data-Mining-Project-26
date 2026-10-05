@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font: 13px system-ui, sans-serif; width: 240px; padding: 12px; }
+    label { display: block; margin: 8px 0 2px; }
+    input, button { width: 100%; box-sizing: border-box; padding: 6px; }
+    button { margin-top: 8px; cursor: pointer; }
+    #count { font-weight: 600; margin-top: 8px; }
+    .on  { color: #b00020; } .off { color: #666; }
+  </style>
+</head>
+<body>
+  <label>Participant (pseudonym)</label>
+  <input id="participant" placeholder="P07">
+
+  <label>Session</label>
+  <input id="session" placeholder="S1">
+
+  <button id="toggle">Start recording</button>
+  <div id="count">Keystrokes: 0</div>
+  <div id="status" class="off">Recording OFF</div>
+
+  <button id="export">Export CSV</button>
+  <button id="clear">Clear data</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
