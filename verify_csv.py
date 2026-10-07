@@ -2,7 +2,7 @@
 import sys
 import pandas as pd
 
-path = sys.argv[1] if len(sys.argv) > 1 else "P07_S1.csv"
+path = sys.argv[1] if len(sys.argv) > 1 else "P03_S1.csv"
 df = pd.read_csv(path)
 
 downs = df[df.event == "down"]
