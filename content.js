@@ -42,21 +42,54 @@ function loadSettings() {
   );
 }
 loadSettings();
-chrome.storage.onChanged.addListener(loadSettings); // react to popup changes
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.events && changes.events.newValue && changes.events.newValue.length === 0) {
+    pressCounter = 0; sampleId = 0; queue.length = 0;   // popup "Clear data"
+  }
+  if (changes.enabled || changes.participantId || changes.sessionId) loadSettings();
+});
 
-// --- store one event row ----------------------------------------------------
+// Counters survive page reloads so press_id / sample_id never restart mid-session.
+let ready = false;
+chrome.storage.local.get(["pressCounter", "sampleId"], (c) => {
+  pressCounter = c.pressCounter || 0;
+  sampleId = c.sampleId || 0;
+  ready = true;
+});
+
+// --- store event rows --------------------------------------------------------
+// Events go to an in-memory queue and are written in batches, one write at a time.
+// (Writing each event with get -> push -> set raced under fast typing and lost
+// ~25% of events.)
+const queue = [];
+let flushing = false;
+
 function record(row) {
+  queue.push(row);
+  flush();
+}
+
+function flush() {
+  if (flushing || queue.length === 0) return;
+  flushing = true;
+  const batch = queue.splice(0, queue.length);
   chrome.storage.local.get({ events: [] }, (data) => {
-    data.events.push(row);
-    chrome.storage.local.set({ events: data.events });
+    chrome.storage.local.set(
+      { events: data.events.concat(batch), pressCounter, sampleId },
+      () => { flushing = false; flush(); }   // events queued meanwhile go next
+    );
   });
 }
+
+setInterval(flush, 500);                                    // safety net
+window.addEventListener("pagehide", flush);
+document.addEventListener("visibilitychange", () => { if (document.hidden) flush(); });
 
 // --- keydown ----------------------------------------------------------------
 document.addEventListener(
   "keydown",
   (e) => {
-    if (!enabled) return;
+    if (!enabled || !ready) return;
     if (e.repeat) return;                 // ignore auto-repeat (held key)
     if (!isChatInput(e.target)) return;   // chat box only, no password fields
 
@@ -86,7 +119,7 @@ document.addEventListener(
 document.addEventListener(
   "keyup",
   (e) => {
-    if (!enabled) return;
+    if (!enabled || !ready) return;
     if (!isChatInput(e.target)) return;
 
     const pid = activePresses[e.code];    // link back to the press

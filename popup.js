@@ -71,6 +71,6 @@ function csvField(v) {
 // --- Clear all stored data (the "deletable" requirement) -------------------
 $("clear").addEventListener("click", () => {
   if (confirm("Delete all recorded keystrokes?")) {
-    chrome.storage.local.set({ events: [] }, () => refreshCount(0));
+    chrome.storage.local.set({ events: [], pressCounter: 0, sampleId: 0 }, () => refreshCount(0));
   }
 });

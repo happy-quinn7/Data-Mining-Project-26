@@ -1,0 +1,2 @@
+file,raw_rows,malformed_rows,duplicate_rows,orphan_up,orphan_down,keycode_mismatch,bad_hold,tiny_sample_rows,long_pauses,missing_key_breaks,segments,clean_presses
+P01_S1.csv,4447,0,0,486,411,0,3,0,6,315,331,1772
