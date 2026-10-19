@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Typing Study Chat</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">Typing Study</span>
+
+    <div id="progress" class="progress" hidden>
+      <div class="track" role="progressbar" aria-label="Session progress"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="bar-fill"></div>
+      </div>
+      <span id="pct">0%</span>
+    </div>
+
+    <span id="paused" class="badge" hidden>Recording paused</span>
+    <span id="mode-badge" class="badge" hidden>Guess mode · nothing is saved</span>
+    <span id="saved" class="saved" hidden>Saved ✓</span>
+
+    <button id="menu-btn" class="icon-btn" type="button" hidden
+            aria-label="Researcher menu" aria-expanded="false" aria-controls="menu">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+              d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>
+      </svg>
+    </button>
+
+    <!-- Researcher menu: everything a participant should not click by accident -->
+    <div id="menu" class="menu" hidden>
+      <p class="menu-title">For the researcher</p>
+      <div class="who"><span id="who"></span><span id="rec" class="rec"></span></div>
+      <p class="menu-count"><strong id="count">0</strong> / 2,000 keystrokes</p>
+      <dl class="stats">
+        <div><dt>Messages</dt><dd id="messages-sent">0</dd></div>
+        <div><dt>Time</dt><dd id="elapsed">0 min</dd></div>
+      </dl>
+      <button id="toggle" type="button">Pause recording</button>
+      <button id="save" class="primary" type="button">Save to data/raw</button>
+      <button id="download" type="button">Download CSV</button>
+      <p id="save-msg" class="note" role="status"></p>
+      <button id="reset" class="danger" type="button">New session…</button>
+      <p class="model small muted"></p>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. Welcome: record a session, or let the model guess who is typing -->
+    <section id="welcome" class="screen">
+     <div class="card">
+      <div class="tabs" role="tablist" aria-label="Mode">
+        <button id="tab-record" role="tab" type="button" aria-selected="true" aria-controls="setup">Record a session</button>
+        <button id="tab-identify" role="tab" type="button" aria-selected="false" aria-controls="identify-intro">Who's typing?</button>
+      </div>
+
+      <div id="identify-intro" class="pane" role="tabpanel" hidden>
+        <h1>Who's typing?</h1>
+        <p>Chat with the assistant and the model will guess which participant you are
+           from your typing rhythm alone. No name, no ID.</p>
+        <ul class="facts">
+          <li>Your typing is compared with everyone recorded so far:
+              <strong id="enrolled-list">nobody yet</strong>.</li>
+          <li>A first guess appears after about 100 key presses and gets more reliable
+              the more you type (aim for 200 or more).</li>
+          <li><strong>Nothing</strong> you type in this mode is saved.</li>
+        </ul>
+        <button id="start-identify" class="primary big" type="button">Start guessing</button>
+        <p class="model small muted"></p>
+      </div>
+
+      <form id="setup" class="pane" role="tabpanel" autocomplete="off">
+        <h1>Welcome</h1>
+        <p>In this study you chat with an AI assistant while we record <em>how</em> you type.
+           Talk about anything you like, the way you would with ChatGPT.</p>
+        <ul class="facts">
+          <li><strong>What is recorded:</strong> the keys you press in the message box, the
+              characters they produce, and when each key goes down and up.</li>
+          <li><strong>Nothing else</strong> on your computer is recorded.</li>
+          <li>The recording is stored under a code like P04, never your name.</li>
+          <li>It takes about <strong>15 minutes</strong>. Type naturally: speed and typos don't matter.</li>
+        </ul>
+
+        <div class="fields">
+          <label>Participant ID
+            <input id="participant" placeholder="P01" maxlength="6" spellcheck="false" required>
+          </label>
+          <label>Session
+            <select id="session">
+              <option value="S1">S1</option>
+              <option value="S2">S2</option>
+              <option value="S3">S3</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="consent">
+          <input id="consent" type="checkbox">
+          <span>I agree to my typing being recorded for this coursework project.</span>
+        </label>
+
+        <button id="start" class="primary big" type="submit" disabled>Start</button>
+        <p id="setup-msg" class="note" role="status"></p>
+        <p class="model small muted"></p>
+      </form>
+     </div>
+    </section>
+
+    <!-- 2. Chat -->
+    <section id="chat" class="chat" hidden>
+      <div id="transcript" class="transcript" aria-live="polite">
+        <div id="empty" class="empty">
+          <h2>Say hello to get started</h2>
+          <p class="muted">Not sure what to talk about? Plan a trip, explain a topic from your
+             course, argue about a film, get help with a recipe, or practise a language.</p>
+        </div>
+      </div>
+
+      <div id="complete" class="complete" hidden>
+        <div>
+          <strong>That's enough for this session. Thank you!</strong>
+          <span class="muted">You can finish now, or keep chatting if you're enjoying it.</span>
+        </div>
+        <button id="finish" class="primary" type="button">Finish session</button>
+      </div>
+
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Type your message…"
+                  autocomplete="off" autocapitalize="off"></textarea>
+        <button id="send" class="send" type="button" disabled aria-label="Send">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                  stroke-linejoin="round" d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+        </button>
+      </div>
+      <p class="hint muted small">Enter to send · Shift+Enter for a new line</p>
+    </section>
+
+    <!-- Guess mode: live prediction of who is typing -->
+    <aside id="guess" class="guess" hidden aria-live="polite">
+      <p class="menu-title">Who's typing?</p>
+
+      <div id="guess-wait">
+        <p class="guess-name muted">Keep typing…</p>
+        <p id="guess-wait-msg" class="small muted">A guess needs a few repeated letter pairs,
+           usually 60 to 100 key presses.</p>
+      </div>
+
+      <div id="guess-result" hidden>
+        <p class="small muted">Best guess</p>
+        <p id="guess-name" class="guess-name"></p>
+        <p id="guess-margin" class="small muted"></p>
+        <ol id="guess-ranking" class="ranking"></ol>
+        <p id="guess-basis" class="small muted"></p>
+      </div>
+
+      <div id="guess-feedback" class="feedback" hidden>
+        <p class="small"><strong>Was it right?</strong> Tell us who you are:</p>
+        <div id="guess-choices" class="choices"></div>
+        <p id="feedback-msg" class="note" role="status"></p>
+      </div>
+
+      <p id="guess-error" class="small warn" hidden></p>
+      <button id="exit-identify" type="button">Exit guess mode</button>
+    </aside>
+
+    <!-- 3. Finished -->
+    <section id="done" class="screen" hidden>
+      <div class="card center">
+        <h1>All done, thank you!</h1>
+        <p id="done-summary" class="muted"></p>
+        <p>Your session has been saved. You can close this tab.</p>
+        <button id="restart" type="button">Back to the start</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

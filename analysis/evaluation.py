@@ -63,6 +63,29 @@ def per_user(scores):
     return pd.Series({u: eer(far_frr(s))[0] for u, s in scores.groupby("claimed")}, name="EER")
 
 
+def compare(feats, detectors, splits):
+    """One row per (split, detector): EER and FRR at 1% FAR.
+
+    detectors: {name: make_detector}; splits: {name: split_features keywords}.
+    A split that leaves no genuine or no impostor tests gets NaN results.
+    """
+    rows = []
+    for split_name, split_kw in splits.items():
+        for det_name, make in detectors.items():
+            scores = score_all(feats, make, **split_kw)
+            row = {"split": split_name, "detector": det_name,
+                   "users": scores.claimed.nunique() if len(scores) else 0,
+                   "EER": np.nan, "FRR@FAR1%": np.nan,
+                   "genuine_tests": int(scores.genuine.sum()) if len(scores) else 0,
+                   "impostor_tests": int((~scores.genuine).sum()) if len(scores) else 0}
+            if row["genuine_tests"] and row["impostor_tests"]:
+                curve = far_frr(scores)
+                row["EER"] = eer(curve)[0]
+                row["FRR@FAR1%"] = frr_at_far(curve, 0.01)
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def window_length_study(k, make_detector, lengths=(50, 100, 200, 300, 500),
                         min_count=2, **split_kw):
     rows = []
