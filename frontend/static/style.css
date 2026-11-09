@@ -87,7 +87,7 @@ button.big { padding: 11px 16px; font-weight: 600; }
 .note { margin: 0; font-size: 13px; color: var(--muted); }
 .note:empty { display: none; }
 
-/* --- top bar --------------------------------------------------------------- */
+
 .topbar {
   position: relative;
   display: flex;
@@ -138,7 +138,7 @@ button.big { padding: 11px 16px; font-weight: 600; }
 }
 .icon-btn:hover:not(:disabled) { color: var(--text); border-color: var(--border); }
 
-/* --- researcher menu ------------------------------------------------------- */
+
 .menu {
   position: absolute;
   top: 52px;
@@ -177,7 +177,7 @@ button.big { padding: 11px 16px; font-weight: 600; }
 .stats dt { font-size: 12px; color: var(--muted); }
 .stats dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* --- main area ------------------------------------------------------------- */
+
 main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 .screen {
@@ -237,7 +237,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color:
 }
 .consent input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); }
 
-/* --- chat ------------------------------------------------------------------ */
+
 .chat {
   flex: 1;
   min-height: 0;
@@ -341,7 +341,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color:
 
 .hint { text-align: center; margin: 6px 0 12px; }
 
-/* --- guess mode: chat on the left, live prediction on the right ------------- */
+
 body.identify main { flex-direction: row; }
 
 .guess {
@@ -380,7 +380,7 @@ body.identify main { flex-direction: row; }
 .choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .choices button { padding: 4px 12px; font-size: 13px; }
 
-/* --- narrow screens -------------------------------------------------------- */
+
 @media (max-width: 600px) {
   .topbar { gap: 10px; }
   .track { width: 80px; }

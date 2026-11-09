@@ -2,12 +2,12 @@
   position: fixed;
   bottom: 12px;
   right: 12px;
-  z-index: 2147483647;            /* above everything */
+  z-index: 2147483647;            /* on top */
   background: #b00020;
   color: #fff;
   font: 600 12px/1.2 system-ui, sans-serif;
   padding: 6px 10px;
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0,0,0,.3);
-  pointer-events: none;           /* never blocks clicks */
+  pointer-events: none;           /* click through */
 }

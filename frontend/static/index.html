@@ -31,7 +31,7 @@
       </svg>
     </button>
 
-    <!-- Researcher menu: everything a participant should not click by accident -->
+    <!-- researcher menu, stuff participants shouldn't click by accident -->
     <div id="menu" class="menu" hidden>
       <p class="menu-title">For the researcher</p>
       <div class="who"><span id="who"></span><span id="rec" class="rec"></span></div>
@@ -50,7 +50,7 @@
   </header>
 
   <main>
-    <!-- 1. Welcome: record a session, or let the model guess who is typing -->
+    <!-- 1. welcome: record a session or start guess mode -->
     <section id="welcome" class="screen">
      <div class="card">
       <div class="tabs" role="tablist" aria-label="Mode">
@@ -110,7 +110,7 @@
      </div>
     </section>
 
-    <!-- 2. Chat -->
+    <!-- 2. chat -->
     <section id="chat" class="chat" hidden>
       <div id="transcript" class="transcript" aria-live="polite">
         <div id="empty" class="empty">
@@ -141,7 +141,7 @@
       <p class="hint muted small">Enter to send · Shift+Enter for a new line</p>
     </section>
 
-    <!-- Guess mode: live prediction of who is typing -->
+    <!-- guess mode: live guess of who's typing -->
     <aside id="guess" class="guess" hidden aria-live="polite">
       <p class="menu-title">Who's typing?</p>
 
@@ -169,7 +169,7 @@
       <button id="exit-identify" type="button">Exit guess mode</button>
     </aside>
 
-    <!-- 3. Finished -->
+    <!-- 3. finished -->
     <section id="done" class="screen" hidden>
       <div class="card center">
         <h1>All done, thank you!</h1>

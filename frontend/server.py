@@ -1,28 +1,24 @@
-"""Typing-study website: an LLM chat page that records keystrokes in the same
-format as the Chrome extension (collector/) and saves them to data/raw/.
+"""typing-study site: a chat page that records keystrokes and saves them to data/raw/
 
-Usage:
+same csv format as the chrome extension (collector/).
+
+usage:
     python frontend/server.py                     # then open http://127.0.0.1:8000
     python frontend/server.py --port 8080
-    python frontend/server.py --host 0.0.0.0      # reachable from other machines on the network
-    python frontend/server.py --model gemma3:4b   # another local model
-    python frontend/server.py --llm claude        # Claude API instead (paid, needs ANTHROPIC_API_KEY)
+    python frontend/server.py --host 0.0.0.0      # let other machines on the network connect
+    python frontend/server.py --model gemma3:4b   # use another local model
+    python frontend/server.py --llm claude        # claude api instead (paid, needs ANTHROPIC_API_KEY)
 
-By default the assistant is a free model running on this computer through
-Ollama (https://ollama.com): install it, then download the model once with
-`ollama pull llama3.2`. Recording and saving work even when no model is
-available; only the assistant's replies need one.
+the assistant runs locally through ollama by default, run `ollama pull llama3.2` once.
+recording and saving still work with no model, you just get no replies.
 
-Endpoints:
-    GET  /             the chat page (files in frontend/static/)
-    GET  /api/status   model name and the session files already in data/raw/
-    POST /api/chat     {"messages": [...]} -> streamed reply, one JSON object per line
-    POST /api/save     {"participant_id", "session_id", "events": [...], "overwrite"}
-                       -> data/raw/<participant>_<session>.csv
-    POST /api/identify {"events": [...]} -> who is typing, among the participants
-                       in data/processed/ (nothing is saved)
-    POST /api/identify/feedback  {"predicted", "actual", "keys", "ranking"}
-                       -> appended to data/identify_log.csv
+endpoints:
+    GET  /                       the chat page (frontend/static/)
+    GET  /api/status             model name + sessions already in data/raw/
+    POST /api/chat               streamed reply, one json object per line
+    POST /api/save               -> data/raw/<participant>_<session>.csv
+    POST /api/identify           who's typing, out of data/processed/ (nothing saved)
+    POST /api/identify/feedback  -> appended to data/identify_log.csv
 """
 import argparse
 import csv
@@ -49,14 +45,14 @@ PARTICIPANT = re.compile(r"^P\d+$")
 SESSION = re.compile(r"^S[123]$")
 SESSION_FILE = re.compile(r"^P\d+_S[123]\.csv$")
 TIMESTAMP = re.compile(r"^\d+(\.\d+)?$")
-MAX_BODY = 50 * 1024 * 1024          # bytes; a long session is about 1 MB of JSON
+MAX_BODY = 50 * 1024 * 1024          # bytes, a long session is ~1mb of json
 
 OLLAMA_URL = "http://127.0.0.1:11434"
-OLLAMA_MODEL = "llama3.2"            # 3B model, about 2 GB; runs on a laptop CPU
+OLLAMA_MODEL = "llama3.2"            # 3b model, ~2gb, fine on a laptop cpu
 CLAUDE_MODEL = "claude-opus-5-5"
-EFFORT = "low"                       # Claude only: quick, conversational replies
+EFFORT = "low"                       # claude only, keeps replies quick
 
-LLM = "ollama"                       # "ollama" or "claude"; set from the command line
+LLM = "ollama"                       # "ollama" or "claude", set with --llm
 MODEL = OLLAMA_MODEL
 
 SYSTEM = (
@@ -80,10 +76,8 @@ def client():
     return _client
 
 
-# --- saving ------------------------------------------------------------------
-
 def check_events(events):
-    """Validate the rows sent by the page; return them as CSV rows."""
+    """check the rows from the page and return them as csv rows"""
     if not isinstance(events, list) or not events:
         raise ValueError("no keystrokes to save")
     rows = []
@@ -104,18 +98,17 @@ def check_events(events):
 
 def to_csv(rows):
     out = io.StringIO()
-    w = csv.writer(out, lineterminator="\n")    # quotes "," and '"' keys like the extension
+    w = csv.writer(out, lineterminator="\n")    # quotes , and " keys like the extension does
     w.writerow(COLUMNS)
     w.writerows(rows)
     return out.getvalue()
 
 
 def save_events(participant_id, session_id, events, folder=RAW, overwrite=False):
-    """Write the session as <participant>_<session>.csv in the extension's format.
+    """write the session to <participant>_<session>.csv
 
-    Saving the same session again (the file on disk is the start of the new
-    one) just replaces it. Any other existing file is only replaced when
-    overwrite=True, and is first moved to <folder>/backups/ so nothing is lost.
+    re-saving the same session just replaces the file. any other file with
+    that name needs overwrite=True and gets moved to backups/ first
     """
     if not PARTICIPANT.match(str(participant_id)):
         raise ValueError("participant ID must look like P01")
@@ -144,8 +137,6 @@ def save_events(participant_id, session_id, events, folder=RAW, overwrite=False)
     return path
 
 
-# --- identification ------------------------------------------------------------
-
 _identifier, _identifier_stamp = None, None
 _identifier_lock = threading.Lock()
 
@@ -155,14 +146,14 @@ def enrolled_files(folder=PROCESSED):
 
 
 def use_analysis_code():
-    """Make analysis/ importable (identification reuses its loading and detectors)."""
+    """make analysis/ importable so we can reuse its loading + detectors"""
     path = str(ROOT / "analysis")
     if path not in sys.path:
         sys.path.insert(0, path)
 
 
 def identifier(folder=PROCESSED):
-    """The Identifier enrolled on data/processed, refitted when those files change."""
+    """identifier fitted on data/processed, refit when those files change"""
     global _identifier, _identifier_stamp
     files = enrolled_files(folder)
     stamp = (str(Path(folder).resolve()), [(p.name, p.stat().st_mtime_ns) for p in files])
@@ -179,7 +170,7 @@ def identifier(folder=PROCESSED):
 
 
 def identify(events, folder=PROCESSED):
-    """Rank the enrolled participants by how closely `events` match their typing."""
+    """rank everyone enrolled by how close `events` is to their typing"""
     rows = check_events(events)
     ident = identifier(folder)
     import numpy as np
@@ -201,7 +192,7 @@ def identify(events, folder=PROCESSED):
 
 
 def log_identification(feedback, path=IDENTIFY_LOG):
-    """Append one "was the guess right?" answer to data/identify_log.csv."""
+    """add one "was the guess right?" answer to the log"""
     predicted, actual = str(feedback.get("predicted", "")), str(feedback.get("actual", ""))
     if not PARTICIPANT.match(predicted) or not (PARTICIPANT.match(actual) or actual == "unknown"):
         raise ValueError("predicted must look like P01; actual like P01 or 'unknown'")
@@ -217,8 +208,6 @@ def log_identification(feedback, path=IDENTIFY_LOG):
                     predicted == actual, json.dumps(feedback.get("ranking", []))])
 
 
-# --- chat --------------------------------------------------------------------
-
 def check_messages(messages):
     if not isinstance(messages, list) or not messages:
         raise ValueError("no messages")
@@ -232,15 +221,15 @@ def check_messages(messages):
 
 
 def stream_reply(messages):
-    """Yield the reply as {"text": ...} pieces, then {"done": stop_reason}.
+    """yield {"text"} chunks then {"done"}
 
-    Errors are yielded as {"error": ...} so the page can show them in the chat.
+    errors come back as {"error"} so the page can show them in the chat
     """
     return stream_ollama(messages) if LLM == "ollama" else stream_claude(messages)
 
 
 def ollama_problem():
-    """None when Ollama is running and has MODEL downloaded, else what to do about it."""
+    """None if ollama is up and has the model, otherwise what to fix"""
     try:
         with urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=3) as r:
             names = {m["name"] for m in json.load(r).get("models", [])}
@@ -256,14 +245,14 @@ def stream_ollama(messages):
         "model": MODEL,
         "messages": [{"role": "system", "content": SYSTEM}] + messages,
         "stream": True,
-        "keep_alive": "30m",                  # stay loaded between messages of a session
-        "options": {"num_ctx": 8192},         # room for a long conversation
+        "keep_alive": "30m",                  # keep the model loaded between messages
+        "options": {"num_ctx": 8192},         # room for long chats
     }).encode("utf-8")
     req = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=body,
                                  headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=300) as r:
-            for line in r:                    # one JSON object per line
+            for line in r:                    # one json object per line
                 if not line.strip():
                     continue
                 chunk = json.loads(line)
@@ -298,14 +287,14 @@ def stream_claude(messages):
             system=SYSTEM,
             messages=messages,
             output_config={"effort": EFFORT},
-            cache_control={"type": "ephemeral"},     # the history is re-sent every turn
+            cache_control={"type": "ephemeral"},     # history gets resent every turn
             betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",                     # a declined reply is retried on another model
+            fallbacks="default",                     # retry declined replies on another model
         ) as stream:
             for text in stream.text_stream:
                 yield {"text": text}
             final = stream.get_final_message()
-    except TypeError as e:                           # raised when no credentials are set
+    except TypeError as e:                           # no api key set
         yield {"error": f"No API credentials: set ANTHROPIC_API_KEY and restart the server. ({e})"}
         return
     except anthropic.AuthenticationError:
@@ -326,8 +315,6 @@ def stream_claude(messages):
         return
     yield {"done": final.stop_reason}
 
-
-# --- HTTP --------------------------------------------------------------------
 
 class Handler(SimpleHTTPRequestHandler):
 
@@ -396,7 +383,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.wfile.write((json.dumps(piece) + "\n").encode("utf-8"))
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-            pass                                     # the page was closed mid-reply
+            pass                                     # page closed mid reply
 
     def read_json(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -419,7 +406,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def log_message(self, fmt, *args):
-        if "/api/" in self.path:                     # skip the noise of static files
+        if "/api/" in self.path:                     # don't log static files
             super().log_message(fmt, *args)
 
 

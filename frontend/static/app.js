@@ -1,9 +1,7 @@
-// app.js — chat page that records keystrokes typed in the message box, in the
-// same format as the Chrome extension (collector/content.js), and saves them
-// to data/raw/ through server.py.
+// records keystrokes while chatting, saves to data/raw
 
-const STORE = "typing-study-v1";   // localStorage key: the session survives page reloads
-const TARGET = 2000;               // keystrokes per session (MIN_KEYSTROKES in tools/clean_raw.py)
+const STORE = "typing-study-v1";   // survives reloads
+const TARGET = 2000;               // keys per session
 const AUTOSAVE_MS = 60_000;
 
 const $ = (id) => document.getElementById(id);
@@ -11,28 +9,28 @@ const input = $("input");
 
 let state = load() || fresh();
 let status = { model: "", problem: null, existing: [] };   // from /api/status
-const activePresses = {};                   // event.code -> press_id, for linking up to down
-let busy = false;                           // waiting for the assistant's reply
+const activePresses = {};                   // code -> press_id
+let busy = false;                           // waiting on reply
 let saving = false;
 
 function fresh() {
   return {
-    mode: "record",    // "record": a study session; "identify": guess who is typing (never saved)
+    mode: "record",    // "record" or "identify"
     participantId: "", sessionId: "S1",
     started: false, recording: false, startedAt: null, consentAt: null,
-    completed: false,  // reached TARGET keystrokes
-    finished: false,   // participant pressed "Finish session"
-    pressCounter: 0,   // gives each press a unique id (= number of presses recorded)
-    sampleId: 0,       // one message = one sample
-    events: [],        // rows in the class CSV format
-    savedRows: 0,      // events already written to data/raw
+    completed: false,  // hit target
+    finished: false,   // clicked finish
+    pressCounter: 0,   // press id + count
+    sampleId: 0,       // one per message
+    events: [],        // csv rows
+    savedRows: 0,      // rows saved so far
     savedAt: null,
     overwriteOk: false,
-    messages: [],      // the conversation sent to the model
+    messages: [],      // chat history
   };
 }
 
-// --- persistence ---------------------------------------------------------------
+
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE)); } catch { return null; }
 }
@@ -41,7 +39,7 @@ let dirty = false;
 function touch() { dirty = true; }
 function persist() {
   dirty = false;
-  if (state.mode === "identify") return;   // guess mode is never stored
+  if (state.mode === "identify") return;   // don't store guess mode
   try {
     localStorage.setItem(STORE, JSON.stringify(state));
   } catch {
@@ -52,51 +50,52 @@ setInterval(() => { if (dirty) persist(); }, 1000);
 window.addEventListener("pagehide", persist);
 document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
 
-// --- high-resolution millisecond clock (same as the extension) ------------------
+
+// ms timestamp
 function nowMs() {
   return performance.timeOrigin + performance.now();
 }
 
-// --- recording ---------------------------------------------------------------------
+
 function record(type, e, pressId) {
   state.events.push({
     participant_id: state.participantId,
     session_id: state.sessionId,
     sample_id: state.sampleId,
     event: type,
-    key_code: e.code,                     // physical key, e.g. "KeyA"
+    key_code: e.code,                     // eg "KeyA"
     timestamp_ms: nowMs().toFixed(3),
     press_id: pressId,
-    key: e.key,                           // character produced, e.g. "a"
+    key: e.key,                           // eg "a"
   });
   touch();
 }
 
 input.addEventListener("keydown", (e) => {
-  if (state.recording && !e.repeat) {     // ignore auto-repeat (held key)
+  if (state.recording && !e.repeat) {     // skip held keys
     const pid = ++state.pressCounter;
-    activePresses[e.code] = pid;          // remember it for the matching keyup
+    activePresses[e.code] = pid;          // for the keyup
     record("down", e, pid);
     showProgress();
     scheduleIdentify();
   }
-  // Enter (without Shift) sends the message -> end of this sample.
+  // enter sends
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
     send();
   }
 });
 
-// Releases are linked to presses made in the message box, wherever focus is by then.
+// match keyup to its keydown
 document.addEventListener("keyup", (e) => {
   if (!state.recording) return;
   const pid = activePresses[e.code];
-  if (pid === undefined) return;          // no recorded press -> skip
+  if (pid === undefined) return;          // not ours
   delete activePresses[e.code];
   record("up", e, pid);
 });
 
-// --- chat ----------------------------------------------------------------------------
+
 input.addEventListener("input", () => { autosize(); updateSend(); });
 
 $("send").addEventListener("click", () => { send(); input.focus(); });
@@ -104,7 +103,7 @@ $("send").addEventListener("click", () => { send(); input.focus(); });
 function send() {
   const text = input.value.trim();
   if (!text || busy || !state.started) return;
-  state.sampleId += 1;                    // the next keystrokes belong to a new message
+  state.sampleId += 1;                    // new sample
   state.messages.push({ role: "user", content: text });
   input.value = "";
   autosize();
@@ -131,7 +130,7 @@ async function ask() {
     if (!res.ok) {
       error = (await res.json().catch(() => ({}))).error || `Server error ${res.status}`;
     } else {
-      // The reply streams in as one JSON object per line: {"text"}, then {"done"} or {"error"}.
+      // read the streamed json lines
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -161,7 +160,7 @@ async function ask() {
 
   if (!error && !reply) error = "The assistant sent an empty reply.";
   if (error) {
-    bubble.remove();                      // a partial reply is discarded
+    bubble.remove();                      // drop partial reply
     addNotice(error, true);
   } else {
     state.messages.push({ role: "assistant", content: reply });
@@ -171,7 +170,7 @@ async function ask() {
   updateSend();
 }
 
-// --- welcome screen ------------------------------------------------------------------
+
 for (const id of ["participant", "consent"]) $(id).addEventListener("input", updateStart);
 function updateStart() {
   $("start").disabled = !$("consent").checked || !$("participant").value.trim();
@@ -203,7 +202,7 @@ $("setup").addEventListener("submit", (e) => {
   input.focus();
 });
 
-// --- end of session --------------------------------------------------------------------
+
 $("finish").addEventListener("click", async () => {
   if (await save()) {
     state.finished = true;
@@ -215,7 +214,7 @@ $("finish").addEventListener("click", async () => {
   }
 });
 
-// --- researcher menu --------------------------------------------------------------------
+
 $("menu-btn").addEventListener("click", () => setMenu($("menu").hidden));
 document.addEventListener("click", (e) => {
   if (!$("menu").hidden && !e.target.closest("#menu, #menu-btn")) setMenu(false);
@@ -248,7 +247,7 @@ $("download").addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${state.participantId}_${state.sessionId}.csv`;   // e.g. P07_S1.csv
+  a.download = `${state.participantId}_${state.sessionId}.csv`;   // eg P07_S1.csv
   a.click();
   URL.revokeObjectURL(url);
 });
@@ -276,9 +275,7 @@ function newSession(ask) {
   refreshStatus();
 }
 
-// Write the session to data/raw/<participant>_<session>.csv. A later save of the
-// same session simply replaces the file; a different recording with that name is
-// only replaced after confirmation (the server keeps a backup). Returns true on success.
+// save to data/raw, true if it worked
 async function save(auto = false) {
   if (saving) return false;
   if (!state.events.length) {
@@ -311,7 +308,7 @@ async function save(auto = false) {
     } else {
       state.savedRows = rows;
       state.savedAt = Date.now();
-      state.overwriteOk = false;          // the file on disk is now this session's own
+      state.overwriteOk = false;          // file is ours now
       $("save-msg").textContent = `${auto ? "Autosaved" : "Saved"} ${out.saved} at ${clock(state.savedAt)}`;
       persist();
       ok = true;
@@ -329,7 +326,7 @@ setInterval(() => {
       state.events.length > state.savedRows) save(true);
 }, AUTOSAVE_MS);
 
-// --- guess mode: who is typing? --------------------------------------------------------
+
 for (const [tab, pane] of [["tab-record", "setup"], ["tab-identify", "identify-intro"]]) {
   $(tab).addEventListener("click", () => showTab(tab));
 }
@@ -352,7 +349,7 @@ $("start-identify").addEventListener("click", () => {
 $("exit-identify").addEventListener("click", () => {
   clearTimeout(idTimer);
   idTimer = null;
-  state = load() || fresh();              // back to the stored study session, untouched
+  state = load() || fresh();              // back to the saved session
   clearTranscript();
   for (const m of state.messages) addBubble(m.role, m.content);
   render();
@@ -363,7 +360,7 @@ let guess = { lastOut: null, feedbackGiven: false };
 let idTimer = null;
 let idBusy = false;
 
-// Ask for a new guess at most every 0.8 s while the participant types.
+// guess at most every 0.8s
 function scheduleIdentify() {
   if (state.mode !== "identify" || idTimer) return;
   idTimer = setTimeout(runIdentify, 800);
@@ -470,7 +467,7 @@ function resetGuessPanel() {
   $("guess-wait-msg").textContent = "A guess needs a few repeated letter pairs, usually 60 to 100 key presses.";
 }
 
-// --- rendering --------------------------------------------------------------------------
+
 function render() {
   const screen = !state.started ? "welcome" : state.finished ? "done" : "chat";
   const identifying = state.mode === "identify";
@@ -505,8 +502,7 @@ function render() {
   updateSend();
 }
 
-// The participant sees a percentage, not a running count of keys (watching a
-// number climb changes how people type). The exact count is in the researcher menu.
+// % only, a live count changes how people type
 function showProgress() {
   const pct = Math.min(100, Math.floor((100 * state.pressCounter) / TARGET));
   $("bar-fill").style.width = pct + "%";
@@ -585,7 +581,7 @@ function scrollDown() {
   t.scrollTop = t.scrollHeight;
 }
 
-// Escape the reply, then render the bits of Markdown chat replies commonly use.
+// escape, then basic markdown
 function formatReply(text) {
   return text
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -594,7 +590,7 @@ function formatReply(text) {
     .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
 }
 
-// The `key` field can be a comma, quote, or newline -> quote it safely (RFC 4180).
+// quote commas, quotes, newlines
 function csvField(v) {
   const s = String(v);
   if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -616,10 +612,11 @@ async function refreshStatus() {
   }
   const enrolled = status.enrolled || [];
   $("enrolled-list").textContent = enrolled.length ? enrolled.join(", ") : "nobody yet";
-  $("start-identify").disabled = enrolled.length < 2;   // a guess needs at least two people to choose from
+  $("start-identify").disabled = enrolled.length < 2;   // need 2+ people
 }
 
-// --- start-up: restore a session in progress --------------------------------------------
+
+// restore session on load
 for (const m of state.messages) addBubble(m.role, m.content);
 const last = state.messages[state.messages.length - 1];
 if (last && last.role === "user" && !state.finished) addNotice("The last reply was interrupted.", true);
