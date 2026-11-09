@@ -1,21 +1,21 @@
-"""Repair raw collector CSVs. Output files keep the exact class format and the
-same names (P02_S1.csv, P02_S2.csv, P02_S3.csv), only in another folder.
+"""
+Clean and make ready the collector's CSVs. Output files keep the same class format and names.
+Moves them to a separate cleaned/ folder.
 
 Usage:
     python tools/clean_raw.py data/raw data/processed          # every file in the folder
     python tools/clean_raw.py data/raw/P02_S1.csv data/processed   # one file
 
-File names must be <participant>_<session>.csv, e.g. P02_S1.csv, with the
-session S1, S2 or S3. Anything else is refused, so a misnamed file can never
-end up in the analysis.
+File names must be <participant>_<session>.csv
+e.g P01_S1.csv - anything else will be rejected
 
 What it fixes (and why):
 1. participant_id and session_id are set from the file name (P02_S1.csv ->
    P02, S1), so typos like "Po2" (letter o) don't create a fake participant.
-2. Several recordings in one file: press_id restarts at 1 when the collector is
-   reset, which makes press_ids ambiguous. A new recording starts when press_id
+2. Several recordings in one file: (unlikely) press_id restarts at 1 when the collector is
+   resets, which makes press_ids ambiguous. A new recording starts when press_id
    drops back or after a gap of more than 30 minutes. The longest recording is
-   kept as the session; the others are listed in the report and dropped.
+   kept; others are dropped and left in report.
 3. Exact duplicate rows are dropped.
 4. Releases with no matching press (or with a different key_code) are dropped:
    no hold time can be computed from them.
@@ -43,7 +43,6 @@ def parse_name(path):
 
 
 def split_recordings(df):
-    """Number each recording: a new one starts when press_id resets or after a long gap."""
     downs = df.event.eq("down")
     last_id = df.press_id.where(downs).ffill().shift().fillna(0)
     reset = downs & (df.press_id < last_id - 5)
@@ -61,14 +60,14 @@ def clean(path_in):
     n0 = len(df)
     df = df.sort_values("timestamp_ms", kind="stable").reset_index(drop=True)
 
-    # 1. pseudonym and session from the file name
+    # name and session no. from the file name
     for col, value in (("participant_id", pid), ("session_id", sid)):
         bad = sorted(set(df[col].astype(str)) - {value})
         if bad:
             report.append(f"{col}: {bad} renamed to {value}")
         df[col] = value
 
-    # 2. separate recordings
+    # separate recordings (if any to separate)
     rec = split_recordings(df)
     sizes = rec.value_counts().sort_index()
     keep = sizes.idxmax()
@@ -79,16 +78,16 @@ def clean(path_in):
                           + ("  <- kept" if r == keep else "  <- dropped"))
     df = df[rec == keep]
 
-    # 3. duplicates
+    # drop duplicates
     dup = df.duplicated(subset=["event", "press_id", "key_code", "timestamp_ms"])
     df = df[~dup]
 
-    # 4. releases without a matching press
+    # drop releases without a matching press
     code_of = df[df.event == "down"].drop_duplicates("press_id").set_index("press_id").key_code
     orphan_up = (df.event == "up") & ~df.press_id.map(code_of).eq(df.key_code)
     df = df[~orphan_up]
 
-    # 5. presses never released (kept)
+    # drop presses never released (kept)
     released = set(df[df.event == "up"].press_id)
     downs = df.event == "down"
     orphan_down = downs & ~df.press_id.isin(released)

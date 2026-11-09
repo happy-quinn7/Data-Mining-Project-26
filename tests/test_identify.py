@@ -27,7 +27,6 @@ def enroll(folder, sessions=("S1", "S2")):
 
 
 def page_events(text, pid="P00", **style):
-    """What the page sends in guess mode."""
     return [dict(zip(server.COLUMNS, r[:5] + [f"{r[5]:.3f}"] + r[6:]))
             for r in typed(text, pid=pid, sid="S0", jitter=8, seed=99, **style)]
 

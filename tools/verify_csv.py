@@ -1,11 +1,12 @@
 """
-Health check for collector CSVs.  Usage: python verify_csv.py P01_S1.csv [P01_S2.csv ...]
+Health check (check for lost data/ corrupted) for collector CSVs.
+
+Usage: python verify_csv.py P01_S1.csv [P01_S2.csv ...]
 
 Run it on a short test export (about 300 characters) BEFORE a real session.
 A healthy collector gives PASS on every check:
   1. same number of `down` and `up` rows
   2. press_ids are contiguous: highest - lowest + 1 == number of downs
-     (a bigger range means events were lost; ids may start above 1 if you did not Clear)
   3. every press_id has exactly one down and one up
   4. no key_code mismatch between a press and its release
   5. hold times are positive; timestamps never go backwards

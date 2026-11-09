@@ -3,6 +3,8 @@ import numpy as np
 INF = float("inf")
 
 
+# only digraphs present in BOTH windows are compared -
+# l.t 5 shared gives 'not comparable'
 def _shared(a, b, min_shared):
     common = a.index.intersection(b.index)
     if len(common) < min_shared:
@@ -10,11 +12,13 @@ def _shared(a, b, min_shared):
     return a[common].to_numpy(float), b[common].to_numpy(float)
 
 
+# absolute ms distance between digraphs
 def shared_mae(f1, f2, part="digraph", min_shared=5):
     s = _shared(f1[part], f2[part], min_shared)
     return INF if s is None else float(np.mean(np.abs(s[0] - s[1])))
 
 
+# diff divided by mean of the 2, ignores overall speed
 def shared_relative(f1, f2, part="digraph", min_shared=5):
     s = _shared(f1[part], f2[part], min_shared)
     if s is None:
@@ -22,7 +26,7 @@ def shared_relative(f1, f2, part="digraph", min_shared=5):
     a, b = s
     return float(np.mean(np.abs(a - b) / ((a + b) / 2)))
 
-
+# compares the order of digraph speeds - speed invariant
 def rank_distance(f1, f2, part="digraph", min_shared=5):
     s = _shared(f1[part], f2[part], min_shared)
     if s is None:
@@ -34,6 +38,7 @@ def rank_distance(f1, f2, part="digraph", min_shared=5):
     return float(np.abs(ra - rb).sum() / max_disorder)
 
 
+# combined digraph and hold
 def combined(f1, f2, w_digraph=0.7, min_shared=5):
     d = shared_relative(f1, f2, "digraph", min_shared)
     h = shared_relative(f1, f2, "hold", min_shared)
@@ -54,6 +59,7 @@ DISTANCES = {
 }
 
 
+#  pairing in comparison to the other two participants
 def distance_matrix(feats, distance=shared_relative):
     n = len(feats)
     m = np.zeros((n, n))
@@ -63,6 +69,8 @@ def distance_matrix(feats, distance=shared_relative):
     return m
 
 
+# distances between windows of the same person vs. different people
+# sanity check on the similarity
 def same_vs_different(feats, distance=shared_relative):
     m = distance_matrix(feats, distance)
     who = np.array([f["participant"] for f in feats])
